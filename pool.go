@@ -10,19 +10,10 @@ import (
 	"time"
 )
 
-// Global Rate Zone Map for Worker Pool
-var rateZoneMap map[string]string
-
 func runWorkerPool(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 	out := make(chan *CDR)
 	numWorkers := 100
 	wg := sync.WaitGroup{}
-
-	rateZoneMap = make(map[string]string)
-	for i := range 100000 {
-		key := fmt.Sprintf("PREFIX-%d", i)
-		rateZoneMap[key] = "EU-Zone-1"
-	}
 
 	for range numWorkers {
 		wg.Add(1)
@@ -76,13 +67,14 @@ func SetCallDirectionF(cdr *CDR) {
 // 2. MEMORY: Rate Zone Lookup
 // ---------------------------------------------------------
 func LookupRateZoneF(cdr *CDR) {
-	// Simulate quick in-memory lookup
-	lookupKey := fmt.Sprintf("PREFIX-%d", rand.Intn(100000))
-	if val, ok := rateZoneMap[lookupKey]; ok {
-		cdr.RateZone = val
-	} else {
-		cdr.RateZone = "GLOBAL-DEFAULT"
+	const payloadSize = 50 * 1024
+	payload := make([]byte, payloadSize)
+
+	// Simulate "Memory Bandwidth" (Writing to the memory)
+	for k := 0; k < payloadSize; k += 1024 {
+		payload[k] = 1
 	}
+	cdr.RateZone = fmt.Sprintf("MEM-OP-%d", len(payload))
 }
 
 // ---------------------------------------------------------

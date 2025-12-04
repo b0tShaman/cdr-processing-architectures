@@ -100,12 +100,6 @@ func LookupRateZone(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 	var wg sync.WaitGroup
 	workers := 5
 
-	rateZoneMap := make(map[string]string)
-	for i := range 100000 {
-		key := fmt.Sprintf("PREFIX-%d", i)
-		rateZoneMap[key] = "EU-Zone-1"
-	}
-
 	for range workers {
 		wg.Add(1)
 		go func() {
@@ -119,13 +113,14 @@ func LookupRateZone(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 						return
 					}
 
-					// Simulate quick in-memory lookup
-					lookupKey := fmt.Sprintf("PREFIX-%d", rand.Intn(100000))
-					if val, ok := rateZoneMap[lookupKey]; ok {
-						cdr.RateZone = val
-					} else {
-						cdr.RateZone = "GLOBAL-DEFAULT"
+					const payloadSize = 50 * 1024
+					payload := make([]byte, payloadSize)
+
+					// Simulate "Memory Bandwidth" (Writing to the memory)
+					for k := 0; k < payloadSize; k += 1024 {
+						payload[k] = 1
 					}
+					cdr.RateZone = fmt.Sprintf("MEM-OP-%d", len(payload))
 					out <- cdr
 				}
 			}
