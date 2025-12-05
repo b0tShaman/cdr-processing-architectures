@@ -11,7 +11,8 @@ func runFanoutFanin(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 
 func fanOut(ctx context.Context, in <-chan *CDR) []<-chan *CDR {
 	outs := make([]<-chan *CDR, 0)
-	for range 5 {
+	numWorkers := 500
+	for range numWorkers {
 		out := make(chan *CDR)
 		go func() {
 			defer close(out)
