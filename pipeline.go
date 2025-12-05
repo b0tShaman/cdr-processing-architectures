@@ -12,7 +12,9 @@ import (
 
 type Stage func(context.Context, <-chan *CDR) <-chan *CDR
 
-func runDaisyPipeline(ctx context.Context, in <-chan *CDR) <-chan *CDR {
+var cap = 500
+
+func runPipeline(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 	pipeline := []Stage{
 		CalculateDuration, // Fast
 		SetCallDirection,  // Slow DB
@@ -23,7 +25,7 @@ func runDaisyPipeline(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 	}
 
 	for _, stage := range pipeline {
-		in = stage(ctx, in)
+		in = stage(ctx, in) // daisy chain
 	}
 	return in
 }
@@ -32,7 +34,7 @@ func runDaisyPipeline(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 0. FAST: Calculate Duration
 // ---------------------------------------------------------
 func CalculateDuration(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	out := make(chan *CDR)
+	out := make(chan *CDR, cap)
 	go func() {
 		defer close(out)
 		for {
@@ -56,9 +58,9 @@ func CalculateDuration(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 1. SLOW DB: Call Direction
 // ---------------------------------------------------------
 func SetCallDirection(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	out := make(chan *CDR)
+	out := make(chan *CDR, cap)
 	var wg sync.WaitGroup
-	workers := 20
+	workers := 200
 
 	for range workers {
 		wg.Add(1)
@@ -96,9 +98,9 @@ func SetCallDirection(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 2. MEMORY: Rate Zone Lookup
 // ---------------------------------------------------------
 func LookupRateZone(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	out := make(chan *CDR)
+	out := make(chan *CDR, cap)
 	var wg sync.WaitGroup
-	workers := 5
+	workers := 1
 
 	for range workers {
 		wg.Add(1)
@@ -138,9 +140,9 @@ func LookupRateZone(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 3. VERY SLOW External API: Home Operator
 // ---------------------------------------------------------
 func FetchHomeOperator(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	out := make(chan *CDR)
+	out := make(chan *CDR, cap)
 	var wg sync.WaitGroup
-	workers := 50
+	workers := 300
 
 	for range workers {
 		wg.Add(1)
@@ -175,9 +177,9 @@ func FetchHomeOperator(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 4. CPU: Anonymized ID (GDPR)
 // ---------------------------------------------------------
 func HashAnonymizedID(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	out := make(chan *CDR)
+	out := make(chan *CDR, cap)
 	var wg sync.WaitGroup
-	workers := 5
+	workers := 1
 
 	for range workers {
 		wg.Add(1)
@@ -213,9 +215,9 @@ func HashAnonymizedID(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 5. NETWORK: Risk Score
 // ---------------------------------------------------------
 func CheckRiskScore(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	out := make(chan *CDR)
+	out := make(chan *CDR, cap)
 	var wg sync.WaitGroup
-	workers := 20
+	workers := 300
 
 	for range workers {
 		wg.Add(1)

@@ -11,19 +11,22 @@ import (
 )
 
 func runWorkerPool(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	out := make(chan *CDR)
-	numWorkers := 100
+	out := make(chan *CDR, cap)
+	numWorkers := 500
 	wg := sync.WaitGroup{}
 
 	for range numWorkers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for cdr := range in {
+			for {
 				select {
 				case <-ctx.Done():
 					return
-				default:
+				case cdr, ok := <-in:
+					if !ok {
+						return
+					}
 					CalculateDurationF(cdr)
 					SetCallDirectionF(cdr)
 					LookupRateZoneF(cdr)
