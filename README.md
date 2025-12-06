@@ -2,7 +2,7 @@
 
 This project benchmarks popular Go concurrency patterns by simulating a Telecommunications use case: processing Call Detail Records (CDRs).
 
-![Demo](assets/demo.gif)
+![Demo](assets/demo.jpg)
 
 ## 🏗 Architectures Compared
 
