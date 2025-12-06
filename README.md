@@ -2,6 +2,8 @@
 
 This project benchmarks popular Go concurrency patterns by simulating a Telecommunications use case: processing Call Detail Records (CDRs).
 
+![Demo](assets/demo.gif)
+
 ## 🏗 Architectures Compared
 
 ### 1. Fan-Out / Fan-In
