@@ -33,7 +33,7 @@ func runPipeline(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 0. FAST: Calculate Duration
 // ---------------------------------------------------------
 func CalculateDuration(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	const numWorkers = 600
+	const numWorkers = 100
 
 	out := make(chan *CDR)
 	var wg sync.WaitGroup
@@ -75,7 +75,7 @@ func CalculateDuration(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 1. SLOW DB: Call Direction
 // ---------------------------------------------------------
 func SetCallDirection(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	const numWorkers = 600
+	const numWorkers = 100
 
 	out := make(chan *CDR)
 	var wg sync.WaitGroup
@@ -123,7 +123,7 @@ func SetCallDirection(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 2. MEMORY: Rate Zone Lookup
 // ---------------------------------------------------------
 func LookupRateZone(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	const numWorkers = 600
+	const numWorkers = 100
 
 	out := make(chan *CDR)
 	var wg sync.WaitGroup
@@ -170,7 +170,7 @@ func LookupRateZone(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 3. VERY SLOW External API: Home Operator
 // ---------------------------------------------------------
 func FetchHomeOperator(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	const numWorkers = 600
+	const numWorkers = 100
 
 	out := make(chan *CDR)
 	var wg sync.WaitGroup
@@ -213,7 +213,7 @@ func FetchHomeOperator(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 4. CPU: Anonymized ID (GDPR)
 // ---------------------------------------------------------
 func HashAnonymizedID(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	const numWorkers = 600
+	const numWorkers = 100
 
 	out := make(chan *CDR)
 	var wg sync.WaitGroup
@@ -257,7 +257,7 @@ func HashAnonymizedID(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 5. NETWORK: Risk Score
 // ---------------------------------------------------------
 func CheckRiskScore(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	const numWorkers = 600
+	const numWorkers = 100
 	
 	out := make(chan *CDR)
 	var wg sync.WaitGroup
