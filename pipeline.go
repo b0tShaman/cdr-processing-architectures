@@ -1,3 +1,4 @@
+// 2. Pipeline (The Daisy Chain) Architecture
 package main
 
 import (
@@ -12,8 +13,6 @@ import (
 
 type Stage func(context.Context, <-chan *CDR) <-chan *CDR
 
-var cap = 500
-
 func runPipeline(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 	pipeline := []Stage{
 		CalculateDuration, // Fast
@@ -21,7 +20,7 @@ func runPipeline(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 		LookupRateZone,    // Memory
 		HashAnonymizedID,  // CPU
 		FetchHomeOperator, // Very Slow DB
-		CheckRiskScore,    // Network
+		CheckRiskScore,    // Network (Variable Latency)
 	}
 
 	for _, stage := range pipeline {
@@ -34,35 +33,12 @@ func runPipeline(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 0. FAST: Calculate Duration
 // ---------------------------------------------------------
 func CalculateDuration(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	out := make(chan *CDR, cap)
-	go func() {
-		defer close(out)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case cdr, ok := <-in:
-				if !ok {
-					return
-				}
+	const numWorkers = 500
 
-				cdr.DurationSec = cdr.EndTime.Sub(cdr.StartTime).Seconds()
-				out <- cdr
-			}
-		}
-	}()
-	return out
-}
-
-// ---------------------------------------------------------
-// 1. SLOW DB: Call Direction
-// ---------------------------------------------------------
-func SetCallDirection(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	out := make(chan *CDR, cap)
+	out := make(chan *CDR)
 	var wg sync.WaitGroup
-	workers := 200
 
-	for range workers {
+	for range numWorkers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -74,13 +50,62 @@ func SetCallDirection(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 					if !ok {
 						return
 					}
-					time.Sleep(40 * time.Millisecond) // Simulate slow DB call
+					// Calculate Duration
+					cdr.DurationSec = cdr.EndTime.Sub(cdr.StartTime).Seconds()
+
+					// Send processed CDR to output channel
+					select {
+					case out <- cdr:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
+}
+
+// ---------------------------------------------------------
+// 1. SLOW DB: Call Direction
+// ---------------------------------------------------------
+func SetCallDirection(ctx context.Context, in <-chan *CDR) <-chan *CDR {
+	const numWorkers = 500
+
+	out := make(chan *CDR)
+	var wg sync.WaitGroup
+
+	for range numWorkers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case cdr, ok := <-in:
+					if !ok {
+						return
+					}
+					// Simulate slow DB call
+					time.Sleep(40 * time.Millisecond)
 					if strings.HasPrefix(cdr.CallerNumber, "44") {
 						cdr.CallDirection = "OUTGOING"
 					} else {
 						cdr.CallDirection = "INCOMING"
 					}
-					out <- cdr
+
+					// Send processed CDR to output channel
+					select {
+					case out <- cdr:
+					case <-ctx.Done():
+						return
+					}
 				}
 			}
 		}()
@@ -98,11 +123,12 @@ func SetCallDirection(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 2. MEMORY: Rate Zone Lookup
 // ---------------------------------------------------------
 func LookupRateZone(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	out := make(chan *CDR, cap)
-	var wg sync.WaitGroup
-	workers := 1
+	const numWorkers = 500
 
-	for range workers {
+	out := make(chan *CDR)
+	var wg sync.WaitGroup
+
+	for range numWorkers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -114,16 +140,20 @@ func LookupRateZone(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 					if !ok {
 						return
 					}
-
+					// Simulate "Memory Bandwidth" (Large Payload Operation)
 					const payloadSize = 50 * 1024
 					payload := make([]byte, payloadSize)
-
-					// Simulate "Memory Bandwidth" (Writing to the memory)
 					for k := 0; k < payloadSize; k += 1024 {
 						payload[k] = 1
 					}
 					cdr.RateZone = fmt.Sprintf("MEM-OP-%d", len(payload))
-					out <- cdr
+
+					// Send processed CDR to output channel
+					select {
+					case out <- cdr:
+					case <-ctx.Done():
+						return
+					}
 				}
 			}
 		}()
@@ -140,11 +170,12 @@ func LookupRateZone(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 3. VERY SLOW External API: Home Operator
 // ---------------------------------------------------------
 func FetchHomeOperator(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	out := make(chan *CDR, cap)
-	var wg sync.WaitGroup
-	workers := 300
+	const numWorkers = 500
 
-	for range workers {
+	out := make(chan *CDR)
+	var wg sync.WaitGroup
+
+	for range numWorkers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -156,11 +187,16 @@ func FetchHomeOperator(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 					if !ok {
 						return
 					}
-
 					// Simulate Very slow API Call
 					time.Sleep(200 * time.Millisecond)
 					cdr.HomeOperator = "Vodafone-UK"
-					out <- cdr
+
+					// Send processed CDR to output channel
+					select {
+					case out <- cdr:
+					case <-ctx.Done():
+						return
+					}
 				}
 			}
 		}()
@@ -177,11 +213,12 @@ func FetchHomeOperator(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 4. CPU: Anonymized ID (GDPR)
 // ---------------------------------------------------------
 func HashAnonymizedID(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	out := make(chan *CDR, cap)
-	var wg sync.WaitGroup
-	workers := 1
+	const numWorkers = 500
 
-	for range workers {
+	out := make(chan *CDR)
+	var wg sync.WaitGroup
+
+	for range numWorkers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -193,12 +230,17 @@ func HashAnonymizedID(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 					if !ok {
 						return
 					}
-
 					// Heavy math operation (SHA256)
 					data := cdr.CallerNumber + cdr.ReceiverNumber + cdr.CallID
 					sum := sha256.Sum256([]byte(data))
 					cdr.AnonymizedID = fmt.Sprintf("%x", sum)
-					out <- cdr
+
+					// Send processed CDR to output channel
+					select {
+					case out <- cdr:
+					case <-ctx.Done():
+						return
+					}
 				}
 			}
 		}()
@@ -215,11 +257,12 @@ func HashAnonymizedID(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 // 5. NETWORK: Risk Score
 // ---------------------------------------------------------
 func CheckRiskScore(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	out := make(chan *CDR, cap)
+	const numWorkers = 500
+	
+	out := make(chan *CDR)
 	var wg sync.WaitGroup
-	workers := 300
 
-	for range workers {
+	for range numWorkers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -231,13 +274,18 @@ func CheckRiskScore(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 					if !ok {
 						return
 					}
-
 					// Simulate variable Network Jitter (20ms to 120ms)
 					latency := time.Duration(20 + rand.Intn(100))
 					time.Sleep(latency * time.Millisecond)
 
 					cdr.RiskScore = rand.Intn(100)
-					out <- cdr
+
+					// Send processed CDR to output channel
+					select {
+					case out <- cdr:
+					case <-ctx.Done():
+						return
+					}
 				}
 			}
 		}()

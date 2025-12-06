@@ -43,10 +43,10 @@ To make the benchmark realistic, processing a single CDR involves 6 distinct ste
 ### Run the Benchmarks
 To compare the performance metrics (Latency, Memory, Allocations):
 ```bash
-# Run benchmarks
 go test -bench=. -benchmem
-
-# To run for a longer duration to stabilize results
+```
+#### To run for a longer duration to stabilize results
+```bash
 go test -bench=. -benchtime=5s -benchmem
 ```
 ### Run the Simulation
