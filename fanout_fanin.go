@@ -16,7 +16,7 @@ func runFanoutFanin(ctx context.Context, in <-chan *CDR) <-chan *CDR {
 }
 
 func fanOut(ctx context.Context, in <-chan *CDR) []<-chan *CDR {
-	const numWorkers = 500
+	const numWorkers = 600
 
 	workerInputs := make([]chan *CDR, numWorkers)
 	workerOutputs := make([]<-chan *CDR, 0, numWorkers)

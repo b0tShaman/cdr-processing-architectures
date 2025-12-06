@@ -12,7 +12,7 @@ import (
 )
 
 func runSemaphore(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	sem := make(chan struct{}, 500)
+	sem := make(chan struct{}, 600)
 	out := make(chan *CDR)
 	go func() {
 		defer close(out)

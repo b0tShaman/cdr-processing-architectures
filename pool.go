@@ -12,7 +12,7 @@ import (
 )
 
 func runWorkerPool(ctx context.Context, in <-chan *CDR) <-chan *CDR {
-	const numWorkers = 500
+	const numWorkers = 600
 
 	out := make(chan *CDR)
 	wg := sync.WaitGroup{}
